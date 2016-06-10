@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 )
 
@@ -41,7 +42,7 @@ func (qq *Queue) Receive() (msgs []*Message, err error) {
 
 	for _, m := range ms.Messages {
 		msgs = append(msgs, &Message{
-			ID:            m.MessageID,
+			ID:            m.MessageId,
 			ReceiptHandle: m.ReceiptHandle,
 			Body:          *m.Body,
 		})
@@ -55,12 +56,12 @@ func (qq *Queue) Receive() (msgs []*Message, err error) {
 
 func (qq *Queue) Delete(msgs []*Message) error {
 	input := &sqs.DeleteMessageBatchInput{
-		QueueURL: aws.String(qq.endpoint),
+		QueueUrl: aws.String(qq.endpoint),
 		Entries:  make([]*sqs.DeleteMessageBatchRequestEntry, 0),
 	}
 	for _, msg := range msgs {
 		input.Entries = append(input.Entries, &sqs.DeleteMessageBatchRequestEntry{
-			ID:            msg.ID,
+			Id:            msg.ID,
 			ReceiptHandle: msg.ReceiptHandle,
 		})
 	}
@@ -115,20 +116,18 @@ func (qp *QueueParams) defaults(endpoint string) {
 	}
 
 	qp.receiveMessageInput = &sqs.ReceiveMessageInput{
-		QueueURL:            aws.String(endpoint),
-		MaxNumberOfMessages: aws.Long(qp.MaxMessages),
-		VisibilityTimeout:   aws.Long(qp.VisibilityTimeout),
-		WaitTimeSeconds:     aws.Long(qp.WaitTimeSeconds),
+		QueueUrl:            aws.String(endpoint),
+		MaxNumberOfMessages: &qp.MaxMessages,
+		VisibilityTimeout:   &qp.VisibilityTimeout,
+		WaitTimeSeconds:     &qp.WaitTimeSeconds,
 	}
 }
 
 func New(endpoint string, region string, params QueueParams) *Queue {
 	params.defaults(endpoint)
+	sess := session.New()
 	return &Queue{
-		sqs: sqs.New(&aws.Config{
-			Credentials: aws.DefaultChainCredentials,
-			Region:      region,
-		}),
+		sqs:      sqs.New(sess, aws.NewConfig().WithRegion(region)),
 		params:   params,
 		endpoint: endpoint,
 		stopCh:   make(chan int),

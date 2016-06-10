@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -16,33 +17,32 @@ const REGION = "us-east-1"
 const REDIS_ADDR = "localhost:6379"
 
 var svc *sqs.SQS
-var queueURL string
+var queueUrl string
 var queue *Queue
 
 var _ = BeforeSuite(func() {
 
-	svc = sqs.New(&aws.Config{
-		Credentials: aws.DefaultChainCredentials,
-		Region:      *aws.String(REGION),
-	})
+	sess := session.New()
+	svc = sqs.New(sess, aws.NewConfig().WithRegion(REGION))
 
 	timestamp := time.Now().Local().Format("20060102150405")
+	queueName := "test-queue-" + timestamp
 	resp, err := svc.CreateQueue(&sqs.CreateQueueInput{
-		QueueName: aws.String("test-queue-" + timestamp),
+		QueueName: &queueName,
 	})
 
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	queueURL = *resp.QueueURL
+	queueUrl = *resp.QueueUrl
 
-	queue = New(queueURL, REGION, QueueParams{})
+	queue = New(queueUrl, REGION, QueueParams{})
 })
 
 var _ = AfterSuite(func() {
 	_, err := svc.DeleteQueue(&sqs.DeleteQueueInput{
-		QueueURL: aws.String(queueURL),
+		QueueUrl: aws.String(queueURL),
 	})
 
 	if err != nil {
@@ -53,7 +53,7 @@ var _ = AfterSuite(func() {
 func sendTestMessage(message string, queueURL string) {
 	svc.SendMessage(&sqs.SendMessageInput{
 		MessageBody: aws.String(message),
-		QueueURL:    aws.String(queueURL),
+		QueueUrl:    aws.String(queueURL),
 	})
 }
 
